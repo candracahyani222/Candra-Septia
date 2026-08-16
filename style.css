@@ -74,6 +74,8 @@ button{ font-family: inherit; }
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
+  --center-x: 0%;
+  transform: translateX(var(--center-x));
 }
 
 /* human: two poses stacked, crossfaded — kept above every furniture hotspot */
@@ -81,6 +83,7 @@ button{ font-family: inherit; }
   transition: opacity .6s ease, filter .35s ease, transform .35s ease;
   z-index: 8;
   filter: brightness(1) saturate(1);
+  --center-x: 0%;
 }
 .human-layer.is-hovered{
   filter: brightness(1.08) saturate(1.12) drop-shadow(0 0 14px rgba(255, 217, 160, .45));
@@ -95,8 +98,8 @@ button{ font-family: inherit; }
 /* very small idle breathing motion on the reading pose */
 #layer-human-reading{ animation: idle-breathe 5.5s ease-in-out infinite; transform-origin: 50% 85%; }
 @keyframes idle-breathe{
-  0%,100%{ transform: translateY(0) scale(1); }
-  50%{ transform: translateY(-0.3%) scale(1.002); }
+  0%,100%{ transform: translateX(var(--center-x)) translateY(0) scale(1); }
+  50%{ transform: translateX(var(--center-x)) translateY(-0.3%) scale(1.002); }
 }
 
 #hotspot-layers{ position: absolute; inset: 0; }
@@ -114,11 +117,13 @@ button{ font-family: inherit; }
   filter: brightness(1) saturate(1);
   transition: filter .35s ease, transform .35s ease;
   will-change: filter, transform;
+  --center-x: 0%;
+  transform: translateX(var(--center-x));
 }
 
 .hotspot-img.is-hovered{
   filter: brightness(1.08) saturate(1.12) drop-shadow(0 0 14px rgba(255, 217, 160, .45));
-  transform: scale(1.006);
+  transform: translateX(var(--center-x)) scale(1.006);
 }
 
 .hotspot-img.is-pressed{
@@ -131,15 +136,15 @@ button{ font-family: inherit; }
   transform-origin: 85% 5%;
 }
 @keyframes curtain-sway{
-  0%,100%{ transform: rotate(0deg); }
-  50%{ transform: rotate(0.35deg); }
+  0%,100%{ transform: translateX(var(--center-x)) rotate(0deg); }
+  50%{ transform: translateX(var(--center-x)) rotate(0.35deg); }
 }
 
 /* notes decoration: barely-there float */
 #layer-notes{ animation: notes-drift 9s ease-in-out infinite; }
 @keyframes notes-drift{
-  0%,100%{ transform: translateY(0); }
-  50%{ transform: translateY(-0.15%); }
+  0%,100%{ transform: translateX(var(--center-x)) translateY(0); }
+  50%{ transform: translateX(var(--center-x)) translateY(-0.15%); }
 }
 
 /* sun glow overlay near the window */
@@ -178,6 +183,25 @@ button{ font-family: inherit; }
 
 /* cursor state on the whole stage, toggled by JS */
 #room-stage.cursor-point{ cursor: pointer; }
+
+/* =========================================================
+   WIDE / LANDSCAPE SCREENS (laptop, desktop)
+   Gambar kamar portrait ditampilkan UTUH & center, bukan
+   di-crop besar-besaran seperti object-fit:cover di layar lebar.
+   Sisi kiri-kanan terisi gradient kamar (sudah ada di #room-stage).
+   ========================================================= */
+@media (min-aspect-ratio: 4/5){
+  .layer, .hotspot-img, .human-layer{
+    --center-x: -50%;
+    top: 0;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    width: auto;
+    height: 100%;
+    object-fit: contain;
+  }
+}
 
 /* =========================================================
    ONBOARDING HINT
