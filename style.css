@@ -76,8 +76,8 @@ button{ font-family: inherit; }
   -webkit-user-drag: none;
 }
 
-/* human: two poses stacked, crossfaded */
-.human-layer{ transition: opacity .6s ease; }
+/* human: two poses stacked, crossfaded — kept above every furniture hotspot */
+.human-layer{ transition: opacity .6s ease; z-index: 8; }
 #layer-human-facing{ opacity: 0; }
 #layer-human-reading.pose-hidden{ opacity: 0; }
 #layer-human-facing.pose-visible{ opacity: 1; }
