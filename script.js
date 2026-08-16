@@ -162,29 +162,37 @@ async function init() {
   });
 
   // prepare alpha-hit canvases (small, for fast pixel lookups)
-  await Promise.all(
-    HOTSPOTS.map(async (h) => {
-      const img = await loadImage(ASSET_BASE + h.file);
-      if (!img) return;
-      const maxDim = 260; // downscaled for cheap getImageData
-      const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
-      const w = Math.max(1, Math.round(img.naturalWidth * scale));
-      const hgt = Math.max(1, Math.round(img.naturalHeight * scale));
-      const c = document.createElement("canvas");
-      c.width = w;
-      c.height = hgt;
-      const ctx = c.getContext("2d", { willReadFrequently: true });
-      try {
-        ctx.drawImage(img, 0, 0, w, hgt);
-        // touch pixel data now to fail fast if canvas is tainted (CORS)
-        ctx.getImageData(0, 0, 1, 1);
-        hitData[h.id] = { ctx, w, hgt, ok: true };
-      } catch (e) {
-        // CORS blocked pixel reading — fall back to whole-image hover for this object
-        hitData[h.id] = { ok: false };
-      }
-    })
-  );
+  async function buildHitEntry(url) {
+    const img = await loadImage(url);
+    if (!img) return { ok: false };
+    const maxDim = 260;
+    const scale = Math.min(1, maxDim / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const hgt = Math.max(1, Math.round(img.naturalHeight * scale));
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = hgt;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    try {
+      ctx.drawImage(img, 0, 0, w, hgt);
+      ctx.getImageData(0, 0, 1, 1);
+      return { ctx, w, hgt, ok: true };
+    } catch (e) {
+      return { ok: false };
+    }
+  }
+
+  await Promise.all([
+    ...HOTSPOTS.map(async (h) => {
+      hitData[h.id] = await buildHitEntry(ASSET_BASE + h.file);
+    }),
+    (async () => {
+      hitData["human-reading"] = await buildHitEntry(ASSET_BASE + ASSETS.humanReading);
+    })(),
+    (async () => {
+      hitData["human-facing"] = await buildHitEntry(ASSET_BASE + ASSETS.humanFacing);
+    })(),
+  ]);
 
   assetsReady = true;
   document.getElementById("loading-veil").classList.add("done");
@@ -205,32 +213,28 @@ function hotspotAtPoint(clientX, clientY) {
   const y = clientY - rect.top;
   if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
 
-  // check from topmost z to bottom
-  const sorted = [...HOTSPOTS].sort((a, b) => b.z - a.z);
-  for (const h of sorted) {
-    const data = hitData[h.id];
-    if (!data) continue;
-
-    if (!data.ok) {
-      // fallback: whole stage counts as a (weak) hit — only used if CORS blocked pixel read
-      continue;
-    }
-
-    // cover-fit math: image (w x hgt at hit-canvas scale) covering rect(width x height)
+  function sampleAlpha(data) {
+    if (!data || !data.ok) return false;
     const coverScale = Math.max(rect.width / data.w, rect.height / data.hgt);
     const dispW = data.w * coverScale;
     const dispH = data.hgt * coverScale;
     const offsetX = (rect.width - dispW) / 2;
     const offsetY = (rect.height - dispH) / 2;
-
     const imgX = Math.floor((x - offsetX) / coverScale);
     const imgY = Math.floor((y - offsetY) / coverScale);
-    if (imgX < 0 || imgY < 0 || imgX >= data.w || imgY >= data.hgt) continue;
-
+    if (imgX < 0 || imgY < 0 || imgX >= data.w || imgY >= data.hgt) return false;
     const pixel = data.ctx.getImageData(imgX, imgY, 1, 1).data;
-    if (pixel[3] > 20) {
-      return h.id;
-    }
+    return pixel[3] > 20;
+  }
+
+  // human is always the topmost hittable layer (she's in the foreground)
+  const humanData = hitData[humanOpen ? "human-facing" : "human-reading"];
+  if (sampleAlpha(humanData)) return "about";
+
+  // then furniture, topmost z first
+  const sorted = [...HOTSPOTS].sort((a, b) => b.z - a.z);
+  for (const h of sorted) {
+    if (sampleAlpha(hitData[h.id])) return h.id;
   }
   return null;
 }
@@ -238,15 +242,21 @@ function hotspotAtPoint(clientX, clientY) {
 /* =========================================================
    HOVER / CURSOR
    ========================================================= */
+function humanEl() {
+  return humanOpen
+    ? document.getElementById("layer-human-facing")
+    : document.getElementById("layer-human-reading");
+}
+
 function setHover(id) {
   if (id === hoveredId) return;
   if (hoveredId) {
-    const prev = hotspotLayerRoot.querySelector(`[data-id="${hoveredId}"]`);
-    if (prev) prev.classList.remove("is-hovered");
+    const prevEl = hoveredId === "about" ? humanEl() : hotspotLayerRoot.querySelector(`[data-id="${hoveredId}"]`);
+    if (prevEl) prevEl.classList.remove("is-hovered");
   }
   hoveredId = id;
   if (id) {
-    const el = hotspotLayerRoot.querySelector(`[data-id="${id}"]`);
+    const el = id === "about" ? humanEl() : hotspotLayerRoot.querySelector(`[data-id="${id}"]`);
     if (el) el.classList.add("is-hovered");
     stage.classList.add("cursor-point");
   } else {
@@ -255,7 +265,7 @@ function setHover(id) {
 }
 
 function pressPulse(id) {
-  const el = hotspotLayerRoot.querySelector(`[data-id="${id}"]`);
+  const el = id === "about" ? humanEl() : hotspotLayerRoot.querySelector(`[data-id="${id}"]`);
   if (!el) return;
   el.classList.add("is-pressed");
   setTimeout(() => el.classList.remove("is-pressed"), 260);
@@ -431,51 +441,31 @@ function bindEvents() {
 
   stage.addEventListener("mouseleave", () => setHover(null));
 
-  // --- click on room stage: figure out if a hotspot or the human was hit ---
+  // --- click on room stage: figure out what (if anything) was hit ---
   stage.addEventListener("click", (e) => {
     if (modalOpen) return;
 
     const hitId = hotspotAtPoint(e.clientX, e.clientY);
+
+    if (hitId === "about") {
+      pressPulse("about");
+      if (humanOpen) closeHuman();
+      else openHuman();
+      return;
+    }
+
     if (hitId) {
       pressPulse(hitId);
       if (humanOpen) closeHuman();
       openModal(hitId);
       return;
     }
+
+    // clicked empty space — close the speech bubble if it's open
+    if (humanOpen) closeHuman();
   });
 
-  // human gets its own listener on its image (simple bounding box is fine —
-  // she's the visual focal point and mostly opaque within her own layer)
-  const readingEl = document.getElementById("layer-human-reading");
-  const facingEl = document.getElementById("layer-human-facing");
-  [readingEl, facingEl].forEach((el) => {
-    el.style.pointerEvents = "auto";
-    el.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (modalOpen) return;
-      if (humanOpen) {
-        closeHuman();
-      } else {
-        openHuman();
-      }
-    });
-    el.addEventListener("mouseenter", () => {
-      if (!modalOpen) stage.classList.add("cursor-point");
-    });
-    el.addEventListener("mouseleave", () => {
-      if (!hoveredId) stage.classList.remove("cursor-point");
-    });
-  });
-
-  // close speech bubble when tapping outside of it / the human
-  document.addEventListener("click", (e) => {
-    if (!humanOpen) return;
-    const bubble = document.getElementById("speech-bubble");
-    if (bubble.contains(e.target) || e.target === readingEl || e.target === facingEl) return;
-    closeHuman();
-  });
-
-  // --- mobile touch: tap = hover pulse + open (no separate hover state needed) ---
+  // --- mobile touch: tap = hover pulse (actual open happens on the click event) ---
   stage.addEventListener(
     "touchstart",
     (e) => {
