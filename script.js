@@ -207,34 +207,40 @@ async function init() {
    ========================================================= */
 // Maps a pointer position (in CSS px, relative to #room-stage) to the
 // hotspot id under it, accounting for object-fit:cover scaling/cropping.
+// must mirror the media query in style.css that switches layers to
+// object-fit:contain + centered on wide/landscape screens
+const wideScreenMQ = window.matchMedia("(min-aspect-ratio: 4/5)");
+
+function sampleAlphaAt(data, x, y, rect) {
+  if (!data || !data.ok) return false;
+  const fitScale = wideScreenMQ.matches
+    ? Math.min(rect.width / data.w, rect.height / data.hgt) // contain
+    : Math.max(rect.width / data.w, rect.height / data.hgt); // cover
+  const dispW = data.w * fitScale;
+  const dispH = data.hgt * fitScale;
+  const offsetX = (rect.width - dispW) / 2;
+  const offsetY = (rect.height - dispH) / 2;
+  const imgX = Math.floor((x - offsetX) / fitScale);
+  const imgY = Math.floor((y - offsetY) / fitScale);
+  if (imgX < 0 || imgY < 0 || imgX >= data.w || imgY >= data.hgt) return false;
+  const pixel = data.ctx.getImageData(imgX, imgY, 1, 1).data;
+  return pixel[3] > 20;
+}
+
 function hotspotAtPoint(clientX, clientY) {
   const rect = stage.getBoundingClientRect();
   const x = clientX - rect.left;
   const y = clientY - rect.top;
   if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
 
-  function sampleAlpha(data) {
-    if (!data || !data.ok) return false;
-    const coverScale = Math.max(rect.width / data.w, rect.height / data.hgt);
-    const dispW = data.w * coverScale;
-    const dispH = data.hgt * coverScale;
-    const offsetX = (rect.width - dispW) / 2;
-    const offsetY = (rect.height - dispH) / 2;
-    const imgX = Math.floor((x - offsetX) / coverScale);
-    const imgY = Math.floor((y - offsetY) / coverScale);
-    if (imgX < 0 || imgY < 0 || imgX >= data.w || imgY >= data.hgt) return false;
-    const pixel = data.ctx.getImageData(imgX, imgY, 1, 1).data;
-    return pixel[3] > 20;
-  }
-
   // human is always the topmost hittable layer (she's in the foreground)
   const humanData = hitData[humanOpen ? "human-facing" : "human-reading"];
-  if (sampleAlpha(humanData)) return "about";
+  if (sampleAlphaAt(humanData, x, y, rect)) return "about";
 
   // then furniture, topmost z first
   const sorted = [...HOTSPOTS].sort((a, b) => b.z - a.z);
   for (const h of sorted) {
-    if (sampleAlpha(hitData[h.id])) return h.id;
+    if (sampleAlphaAt(hitData[h.id], x, y, rect)) return h.id;
   }
   return null;
 }
