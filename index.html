@@ -1,70 +1,68 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
 <title>Candra's Room ♡</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,500&family=Nunito:wght@400;600;700;800&family=Caveat:wght@500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
   <!-- Loading veil -->
-  <div id="loader">
-    <div class="loader-heart">♡</div>
-    <p>entering the room…</p>
+  <div id="loading-veil">
+    <div class="loading-heart">♡</div>
   </div>
 
-  <!-- The room stage keeps a fixed 1080:1920 ratio so every hotspot
-       (positioned in %) always lines up with the photo underneath,
-       no matter the screen size. -->
-  <div id="stage">
+  <main id="room-stage" aria-label="Kamar interaktif Candra">
 
-    <img id="room-photo" src="assets/room-main.png" alt="Candra's cozy pink bedroom" draggable="false">
+    <!-- ambient light overlay -->
+    <div id="sun-glow" aria-hidden="true"></div>
+    <div id="dust-layer" aria-hidden="true"></div>
 
-    <!-- ambient atmosphere, purely decorative, sits above the photo -->
-    <div id="light-rays"></div>
-    <div id="dust" aria-hidden="true"></div>
+    <!-- static / decorative layers -->
+    <img class="layer" id="layer-bg" src="" alt="" draggable="false" />
+    <img class="layer" id="layer-notes" src="" alt="" draggable="false" aria-hidden="true" />
 
-    <!-- soft slice layers that gently move a piece of the photo itself,
-         so the motion always stays pixel-aligned with the room -->
-    <div class="ambient-slice" id="slice-curtain" aria-hidden="true"></div>
-    <div class="ambient-slice" id="slice-plant" aria-hidden="true"></div>
-    <div class="ambient-slice" id="slice-girl" aria-hidden="true"></div>
-    <div class="lamp-glow" id="lamp-glow" aria-hidden="true"></div>
-    <div id="dusk-overlay" aria-hidden="true"></div>
+    <!-- human is special: idle vs facing -->
+    <img class="layer human-layer" id="layer-human-reading" src="" alt="Candra sedang membaca" draggable="false" />
+    <img class="layer human-layer" id="layer-human-facing" src="" alt="Candra menoleh ke kamu" draggable="false" />
 
-    <!-- invisible clickable hotspots, positioned in % -->
-    <div class="hotspot" data-target="profile"   style="top:11%; left:0%;  width:20%; height:29%;" aria-label="Mirror — Profile"></div>
-    <div class="hotspot" data-target="growth"    style="top:14%; left:22%; width:15%; height:23%;" aria-label="Plant — Growth"></div>
-    <div class="hotspot" data-target="journey"   style="top:14%; left:38%; width:20%; height:10%;" aria-label="Bookshelf — My Journey"></div>
-    <div class="hotspot" data-target="world"     style="top:3%;  left:74%; width:26%; height:44%;" aria-label="Window — My World"></div>
-    <div class="hotspot" data-target="dreams"    style="top:38%; left:40%; width:60%; height:32%;" aria-label="Bed — Dreams"></div>
-    <div class="hotspot" data-target="projects"  style="top:42%; left:0%;  width:37%; height:18%;" aria-label="Desk — Projects"></div>
-    <div class="hotspot" data-target="mood"      style="top:41%; left:17%; width:15%; height:9%;"  aria-label="Lamp — Mood"></div>
-    <div class="hotspot" data-target="contact"   style="top:50%; left:0%;  width:25%; height:13%;" aria-label="Chair — Contact"></div>
-    <div class="hotspot" data-target="about"     style="top:44%; left:29%; width:41%; height:39%;" aria-label="Candra — About me"></div>
+    <!-- interactive object layers get injected by script.js -->
+    <div id="hotspot-layers"></div>
 
-    <!-- speech bubble that appears near the character on "about" click -->
-    <div id="speech-bubble" class="hidden">Hi, I'm Candra ♡</div>
+    <!-- invisible canvas used only for pointer/alpha hit-testing, never shown -->
+    <canvas id="hit-canvas" style="display:none;"></canvas>
 
+    <!-- speech bubble for the human -->
+    <div id="speech-bubble" class="speech-bubble hidden" role="dialog" aria-label="Perkenalan Candra">
+      <div class="speech-tail"></div>
+      <p class="speech-greeting">Hi, I'm Candra ♡</p>
+      <ul class="speech-list" id="speech-list"></ul>
+    </div>
+
+    <!-- first-visit hint -->
+    <div id="onboard-hint" class="onboard-hint">
+      <span>tap benda di kamar untuk explore</span>
+      <span class="onboard-sparkle">✨</span>
+    </div>
+
+  </main>
+
+  <!-- content modal -->
+  <div id="modal-scrim" class="modal-scrim hidden">
+    <section id="modal-card" class="modal-card" role="dialog" aria-modal="true">
+      <button id="modal-close" class="modal-close" aria-label="Tutup">✕</button>
+      <header class="modal-header">
+        <p class="modal-eyebrow" id="modal-eyebrow"></p>
+        <h2 class="modal-title" id="modal-title"></h2>
+      </header>
+      <div class="modal-body" id="modal-body"></div>
+    </section>
   </div>
 
-  <!-- gentle hint on first load -->
-  <div id="hint">tap around the room ✧</div>
-
-  <!-- sound / ambience toggle -->
-  <button id="ambience-toggle" aria-label="Toggle room lighting">☀</button>
-
-  <!-- modal / content panel -->
-  <div id="overlay" class="hidden"></div>
-  <div id="panel" class="hidden" role="dialog" aria-modal="true">
-    <button id="panel-close" aria-label="Close">✕</button>
-    <div id="panel-inner"></div>
-  </div>
-
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
