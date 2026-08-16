@@ -77,7 +77,17 @@ button{ font-family: inherit; }
 }
 
 /* human: two poses stacked, crossfaded — kept above every furniture hotspot */
-.human-layer{ transition: opacity .6s ease; z-index: 8; }
+.human-layer{
+  transition: opacity .6s ease, filter .35s ease, transform .35s ease;
+  z-index: 8;
+  filter: brightness(1) saturate(1);
+}
+.human-layer.is-hovered{
+  filter: brightness(1.08) saturate(1.12) drop-shadow(0 0 14px rgba(255, 217, 160, .45));
+}
+.human-layer.is-pressed{
+  filter: brightness(1.15) saturate(1.18) drop-shadow(0 0 20px rgba(255, 217, 160, .6));
+}
 #layer-human-facing{ opacity: 0; }
 #layer-human-reading.pose-hidden{ opacity: 0; }
 #layer-human-facing.pose-visible{ opacity: 1; }
